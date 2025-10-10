@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Service de monitoring</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="cadre">
+    <header class="entete">
+      <h1>Service de monitoring <span class="led"></span></h1>
+      <p class="sous-titre">
+        Veuillez saisir une URL
+      </p>
+    </header>
+
+    <!-- Formulaire de saisie : une barre de recherche “style Google” -->
+    <form id="formulaire" class="barre" role="search" aria-label="Ajouter un ping">
+      <input id="champ-url" class="champ" placeholder="https://exemple.com/" autocomplete="off" />
+      <button id="btn-tester" class="btn" type="submit">Tester</button>
+      <button id="btn-vider" class="btn secondaire" type="button" title="Effacer les résultats">Effacer</button>
+    </form>
+
+    <!-- Zone d’état (erreurs / infos) -->
+    <div id="zone-message" class="message" aria-live="polite"></div>
+
+    <!-- Console des résultats -->
+    <section class="console" aria-live="polite" aria-relevant="additions">
+      <div class="ligne en-tete">
+        <div>Heure</div>
+        <div>URL</div>
+        <div>Statut</div>
+        <div>Latence</div>
+        <div>Code HTTP</div>
+      </div>
+      <div id="ligne-vide" class="vide">Aucun résultat pour l’instant.</div>
+      <div id="liste" class="liste"></div>
+    </section>
+  </main>
+
+  <script src="./script.js" defer></script>
+</body>
+</html>

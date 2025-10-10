@@ -1,0 +1,17 @@
+# .air.toml - reload auto pour Go
+
+# Dossier racine du projet
+root = "."
+tmp_dir = "tmp"
+
+[build]
+cmd = "go build -o ./tmp/app ."
+bin = "tmp/app"
+full_bin = "tmp/app"
+include_ext = ["go"]
+exclude_dir = ["tmp", "vendor", ".git"]
+exclude_regex = ["_test\\.go"]
+delay = 200                           # ms d'anti-rebond
+
+[log]
+time = true
