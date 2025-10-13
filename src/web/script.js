@@ -10,12 +10,17 @@ const champURL = document.getElementById('champ-url');
 const formulaire = document.getElementById('formulaire');
 const btnTester = document.getElementById('btn-tester');
 const btnVider = document.getElementById('btn-vider');
+const champFreq = document.getElementById('champ-freq');
+const btnAuto = document.getElementById('btn-auto');
+const btnStop = document.getElementById('btn-stop');
 const zoneMessage = document.getElementById('zone-message');
 const liste = document.getElementById('liste');
 const ligneVide = document.getElementById('ligne-vide');
 
 const LIMITE_PAR_DEFAUT = 50;
 const SEUIL_LENTE_MS = 800; // doit être cohérent avec le backend (variable d’env. SEUIL_LENTE_MS)
+let intervalId = null;
+let enCours = false; // anti-chevauchement
 
 // -------- Utilitaires UI --------
 
@@ -30,7 +35,7 @@ function viderConsole() {
     const v = document.createElement('div');
     v.id = 'ligne-vide';
     v.className = 'vide';
-    v.textContent = "Aucun résultat pour l’instant.";
+    v.textContent = 'Aucun résultat pour l’instant.';
     liste.parentElement.insertBefore(v, liste);
   }
 }
@@ -39,7 +44,11 @@ function formaterHeure(dateISO) {
   try {
     const d = new Date(dateISO);
     if (isNaN(d.getTime())) throw new Error('invalid date');
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    return d.toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
   } catch {
     return '—';
   }
@@ -50,7 +59,14 @@ function creerLigne(statut) {
   const vide = document.getElementById('ligne-vide');
   if (vide) vide.remove();
 
-  const { url, est_disponible, code_http, message_erreur, latence_ms, verifie_a } = statut;
+  const {
+    url,
+    est_disponible,
+    code_http,
+    message_erreur,
+    latence_ms,
+    verifie_a,
+  } = statut;
 
   // Détermine le statut visuel (ok / warn / err)
   let texteStatut = 'EN LIGNE';
@@ -108,26 +124,28 @@ async function appelAPI(url, options) {
 
 async function verifierUneURL(url) {
   if (!url || !/^https?:\/\//i.test(url)) {
-    throw new Error("Veuillez saisir une URL valide commençant par http:// ou https://");
+    throw new Error(
+      'Veuillez saisir une URL valide commençant par http:// ou https://',
+    );
   }
- const reponse = await appelAPI('/api/verifier', {
-   method: 'POST',
-   headers: { 'Content-Type': 'application/json' },
-   body: JSON.stringify({ url }),
- });
+  const reponse = await appelAPI('/api/verifier', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url }),
+  });
   const statut = reponse.statut; // ton backend renvoie toujours {statut:{...}}
-  if (!statut) throw new Error("Réponse API invalide");
+  if (!statut) throw new Error('Réponse API invalide');
   creerLigne(statut);
   return statut;
 }
 
 async function chargerResultats(limit = LIMITE_PAR_DEFAUT) {
- const reponse = await appelAPI(
-   `/api/resultats?limit=${encodeURIComponent(limit)}`,
-   {
-     method: 'GET',
-   },
- );
+  const reponse = await appelAPI(
+    `/api/resultats?limit=${encodeURIComponent(limit)}`,
+    {
+      method: 'GET',
+    },
+  );
   const listeResultats = Array.isArray(reponse)
     ? reponse
     : reponse?.resultats ?? [];
@@ -171,6 +189,50 @@ window.addEventListener('DOMContentLoaded', async () => {
   try {
     await chargerResultats(LIMITE_PAR_DEFAUT);
   } catch (err) {
-    afficherMessage(`Impossible de charger les résultats : ${err.message}`, 'err');
+    afficherMessage(
+      `Impossible de charger les résultats : ${err.message}`,
+      'err',
+    );
   }
 });
+
+// -------- Auto-ping --------
+
+function startAutoPing() {
+  const url = (champURL.value || '').trim();
+  const secs = parseInt(champFreq.value, 10);
+  if (!url) {
+    afficherMessage("Saisissez d'abord une URL.", 'info');
+    champURL.focus();
+    return;
+  }
+  if (!Number.isFinite(secs) || secs < 1) {
+    afficherMessage('Fréquence invalide. Entrez un nombre ≥ 1.', 'err');
+    champFreq.focus();
+    return;
+  }
+  if (intervalId) clearInterval(intervalId);
+  afficherMessage(`Auto-ping activé: toutes les ${secs}s`, 'ok');
+  intervalId = setInterval(async () => {
+    if (enCours) return; // pas de chevauchement
+    enCours = true;
+    try {
+      await verifierUneURL(url);
+    } catch (err) {
+      afficherMessage(err.message, 'err');
+    } finally {
+      enCours = false;
+    }
+  }, secs * 1000);
+}
+
+function stopAutoPing() {
+  if (intervalId) {
+    clearInterval(intervalId);
+    intervalId = null;
+    afficherMessage('Auto-ping arrêté.', 'info');
+  }
+}
+
+btnAuto?.addEventListener('click', startAutoPing);
+btnStop?.addEventListener('click', stopAutoPing);

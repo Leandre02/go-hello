@@ -1,44 +1,86 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="fr">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Service de monitoring</title>
-  <link rel="stylesheet" href="./styles.css" />
-</head>
-<body>
-  <main class="cadre">
-    <header class="entete">
-      <h1>Service de monitoring <span class="led"></span></h1>
-      <p class="sous-titre">
-        Veuillez saisir une URL
-      </p>
-    </header>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Service de monitoring</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="cadre">
+      <header class="entete">
+        <h1>Service de monitoring <span class="led"></span></h1>
+        <p class="sous-titre">Veuillez saisir une URL</p>
+      </header>
 
-    <!-- Formulaire de saisie : une barre de recherche “style Google” -->
-    <form id="formulaire" class="barre" role="search" aria-label="Ajouter un ping">
-      <input id="champ-url" class="champ" placeholder="https://exemple.com/" autocomplete="off" />
-      <button id="btn-tester" class="btn" type="submit">Tester</button>
-      <button id="btn-vider" class="btn secondaire" type="button" title="Effacer les résultats">Effacer</button>
-    </form>
+      <!-- Formulaire de saisie : une barre de recherche “style Google” -->
+      <form
+        id="formulaire"
+        class="barre"
+        role="search"
+        aria-label="Ajouter un ping"
+      >
+        <input
+          id="champ-url"
+          class="champ"
+          placeholder="https://exemple.com/"
+          autocomplete="off"
+        />
+        <button id="btn-tester" class="btn" type="submit">Tester</button>
+        <button
+          id="btn-vider"
+          class="btn secondaire"
+          type="button"
+          title="Effacer les résultats"
+        >
+          Effacer
+        </button>
 
-    <!-- Zone d’état (erreurs / infos) -->
-    <div id="zone-message" class="message" aria-live="polite"></div>
+        <!-- Contrôles auto-ping -->
+        <input
+          id="champ-freq"
+          class="champ petit"
+          type="number"
+          min="1"
+          value="5"
+          title="Fréquence des pings (secondes)"
+          aria-label="Fréquence (secondes)"
+        />
+        <button
+          id="btn-auto"
+          class="btn secondaire"
+          type="button"
+          title="Démarrer l'auto-ping"
+        >
+          Auto
+        </button>
+        <button
+          id="btn-stop"
+          class="btn secondaire"
+          type="button"
+          title="Arrêter l'auto-ping"
+        >
+          Stop
+        </button>
+      </form>
 
-    <!-- Console des résultats -->
-    <section class="console" aria-live="polite" aria-relevant="additions">
-      <div class="ligne en-tete">
-        <div>Heure</div>
-        <div>URL</div>
-        <div>Statut</div>
-        <div>Latence</div>
-        <div>Code HTTP</div>
-      </div>
-      <div id="ligne-vide" class="vide">Aucun résultat pour l’instant.</div>
-      <div id="liste" class="liste"></div>
-    </section>
-  </main>
+      <!-- Zone d’état (erreurs / infos) -->
+      <div id="zone-message" class="message" aria-live="polite"></div>
 
-  <script src="./script.js" defer></script>
-</body>
+      <!-- Console des résultats -->
+      <section class="console" aria-live="polite" aria-relevant="additions">
+        <div class="ligne en-tete">
+          <div>Heure</div>
+          <div>URL</div>
+          <div>Statut</div>
+          <div>Latence</div>
+          <div>Code HTTP</div>
+        </div>
+        <div id="ligne-vide" class="vide">Aucun résultat pour l’instant.</div>
+        <div id="liste" class="liste"></div>
+      </section>
+    </main>
+
+    <script src="./script.js" defer></script>
+  </body>
 </html>
