@@ -1,0 +1,20 @@
+# Version du fichier docker-compose pour le développement (local)
+# Utilise une image officielle de Go avec Alpine Linux pour un environnement léger
+
+services:
+  app:
+    image: golang:1.23-alpine    # image qui contient le compilateur Go
+    working_dir: /app
+    volumes:
+      - .:/app                   # ton code local monté dans le conteneur
+    env_file:
+      - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    ports:
+      - "8080:8080"
+    command: go run ./src/cmd/server/main.go
+
+# Pour lancement : docker-compose -f docker-compose.dev.yml up --build
+# Pour arrêt : docker-compose -f docker-compose.dev.yml down | ctrl+C

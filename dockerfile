@@ -1,21 +1,29 @@
-# Fichier docker de mon application Go
-
-# Étape build
-FROM golang:1.22 AS build
+# -------- Étape 1 : build
+FROM golang:1.23-alpine AS builder
 WORKDIR /app
+RUN apk add --no-cache git ca-certificates
 
-# Copie uniquement go.mod (go.sum peut ne pas exister au début)
-COPY go.mod ./
+# Cache deps
+COPY go.mod go.sum ./
 RUN go mod download
 
-# Copie le reste du code
-COPY . .
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o app
+# Code (uniquement src/ pour rester propre)
+COPY src ./src
 
-# Étape runtime minimaliste
-FROM gcr.io/distroless/static-debian12
-WORKDIR /app
-COPY --from=build /app/app /app/app
+# Build binaire statique
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" \
+    -o /out/monitoring ./src/cmd/server/main.go
+
+# -------- Étape 2 : image finale minuscule
+FROM scratch
+# Certifs HTTPS
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+# Binaire
+COPY --from=builder /out/monitoring /monitoring
+# Front & SQL (si utiles)
+COPY src/web/ /web/
+COPY src/database/init.sql /migrations/10_init.sql
+COPY src/database/dbtrigger.sql /migrations/20_trigger.sql
+
 EXPOSE 8080
-USER nonroot:nonroot
-ENTRYPOINT ["/app/app"]
+ENTRYPOINT ["/monitoring"]

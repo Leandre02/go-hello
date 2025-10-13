@@ -46,27 +46,30 @@ Routes adaptent cette logique aux requêtes HTTP.
 Middleware améliore la qualité opérationnelle.
 
 Cette organisation facilite l’évolution future, l’extension fonctionnelle ou technique, et le travail collaboratif grace à des conventions claires et des interfaces stables.
- */
+*/
 
 package main
 
 import (
-    "log"
-    "net/http"
-    "os"
-    "os/signal"
-    "syscall"
-    "context"
-    "time"
+	"context"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
-    "example.com/go-hello/src/internal/routes"
-     "example.com/go-hello/src/repos"
+	"example.com/go-hello/src/internal/routes"
+	"example.com/go-hello/src/repos"
 )
 
 // fonction main : initialisation et lancement du serveur HTTP
 func main() {
-    // DSN PostgreSQL - adapter selon ton environnement
-    dsn := "postgresql://monitoring_database_zp7a_user:OBFLhG8AjhyhnLCjqWTXWlCz0FnRW8et@dpg-d3jchol6ubrc73co188g-a.oregon-postgres.render.com/monitoring_database_zp7a"
+    // DSN PostgreSQL 
+    dsn := os.Getenv("DATABASE_URL")
+    if dsn == "" {
+        log.Println("[ERREUR] DATABASE_URL non défini: passer -e DATABASE_URL=... au docker run, ou définir la variable d'environnement avant d'exécuter.")
+    }
 
     // Initialisation du dépôt PostgreSQL
     depot, err := repos.NouvelleConnexion(dsn)
@@ -96,9 +99,6 @@ func main() {
         Handler: mux,
     }
 
-    if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-    log.Fatalf("serveur: %v", err)
-}
     // Démarrage du serveur HTTP dans une goroutine pour permettre un arrêt propre
     go func() {
         log.Println("Serveur démarré sur :8080")

@@ -110,21 +110,27 @@ async function verifierUneURL(url) {
   if (!url || !/^https?:\/\//i.test(url)) {
     throw new Error("Veuillez saisir une URL valide commençant par http:// ou https://");
   }
-  const reponse = await appelAPI('/api/check', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url })
-  });
-  const statut = reponse?.statut;
-  if (statut) creerLigne(statut);
+ const reponse = await appelAPI('/api/verifier', {
+   method: 'POST',
+   headers: { 'Content-Type': 'application/json' },
+   body: JSON.stringify({ url }),
+ });
+  const statut = reponse.statut; // ton backend renvoie toujours {statut:{...}}
+  if (!statut) throw new Error("Réponse API invalide");
+  creerLigne(statut);
   return statut;
 }
 
 async function chargerResultats(limit = LIMITE_PAR_DEFAUT) {
-  const reponse = await appelAPI(`/api/resultats?limit=${encodeURIComponent(limit)}`, {
-    method: 'GET'
-  });
-  const listeResultats = reponse?.resultats || [];
+ const reponse = await appelAPI(
+   `/api/resultats?limit=${encodeURIComponent(limit)}`,
+   {
+     method: 'GET',
+   },
+ );
+  const listeResultats = Array.isArray(reponse)
+    ? reponse
+    : reponse?.resultats ?? [];
   // Réinitialise puis rend les résultats
   viderConsole();
   for (const s of listeResultats) {

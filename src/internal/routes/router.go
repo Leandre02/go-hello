@@ -111,7 +111,9 @@ func HandlerVerification(app ServicesApp) http.HandlerFunc {
             _ = app.Depot.EnregistrerStatutMoniteur(ctx, statut)
         }
 
-        ecrireJSON(w, http.StatusOK, vueDepuisModele(statut))
+       ecrireJSON(w, http.StatusOK, map[string]any{
+           "statut": vueDepuisModele(statut),
+       })
     }
 }
 
@@ -153,7 +155,9 @@ func HandlerResultats(app ServicesApp) http.HandlerFunc {
         for _, s := range selection {
             vues = append(vues, vueDepuisModele(s))
         }
-        ecrireJSON(w, http.StatusOK, vues)
+        ecrireJSON(w, http.StatusOK, map[string]any{
+            "resultats": vues,
+        })
     }
 }
 
@@ -178,6 +182,7 @@ func EnregistrerRoutes(app ServicesApp) http.Handler {
     routes.HandleFunc("/api/verifier", HandlerVerification(app))
     routes.HandleFunc("/api/resultats", HandlerResultats(app))
     routes.HandleFunc("/api/etat", HandlerEtatApplication())
-
+    
+    routes.Handle("/", http.FileServer(http.Dir("/web")))
     return routes
 }
