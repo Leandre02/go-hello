@@ -77,12 +77,12 @@ func (p *Postgres) AjouterMoniteur(ctx context.Context, m models.Moniteur) error
         m.Type = "http"
     }
     const requete = `
-        INSERT INTO moniteurs (nom, url, type)
+        INSERT INTO monitoring.moniteurs (nom, url, type)
         VALUES ($1, $2, $3)
         ON CONFLICT (url)
         DO UPDATE SET
-            nom = COALESCE(NULLIF(EXCLUDED.nom, ''), moniteurs.nom),
-            type = COALESCE(NULLIF(EXCLUDED.type, ''), moniteurs.type);
+            nom = COALESCE(NULLIF(EXCLUDED.nom, ''), monitoring.moniteurs.nom),
+            type = COALESCE(NULLIF(EXCLUDED.type, ''), monitoring.moniteurs.type);
     `
     _, err := p.db.ExecContext(ctx, requete, m.Nom, m.URL, m.Type)
     return err
@@ -90,7 +90,7 @@ func (p *Postgres) AjouterMoniteur(ctx context.Context, m models.Moniteur) error
 
 // SupprimerMoniteur supprime un moniteur via son identifiant.
 func (p *Postgres) SupprimerMoniteur(ctx context.Context, url string) error {
-    res, err := p.db.ExecContext(ctx, `DELETE FROM moniteurs WHERE url=$1`, url)
+    res, err := p.db.ExecContext(ctx, `DELETE FROM monitoring.moniteurs WHERE url=$1`, url)
     if err != nil {
         return err
     }
@@ -102,7 +102,7 @@ func (p *Postgres) SupprimerMoniteur(ctx context.Context, url string) error {
 
 // ListerMoniteurs retourne tous les moniteurs ordonnés par ID.
 func (p *Postgres) ListerMoniteurs(ctx context.Context) ([]models.Moniteur, error) {
-    rows, err := p.db.QueryContext(ctx, `SELECT id, nom, url, type FROM moniteurs ORDER BY id ASC`)
+    rows, err := p.db.QueryContext(ctx, `SELECT id, nom, url, type FROM monitoring.moniteurs ORDER BY id ASC`)
     if err != nil {
         return nil, err
     }
@@ -129,7 +129,7 @@ func (p *Postgres) EnregistrerStatutMoniteur(ctx context.Context, s models.Statu
         s.VerifieA = time.Now()
     }
     const requete = `
-        INSERT INTO statuts (moniteur_id, url, est_disponible, code_http, message_erreur, latence_ms, verifie_a)
+        INSERT INTO monitoring.statuts (moniteur_id, url, est_disponible, code_http, message_erreur, latence_ms, verifie_a)
         VALUES ($1, $2, $3, $4, $5, $6, $7)
     `
     // Convertir MoniteurID (int) en int64 pour la DB, ou NULL si 0
@@ -150,7 +150,7 @@ func (p *Postgres) EnregistrerStatutMoniteur(ctx context.Context, s models.Statu
 func (p *Postgres) DerniersStatutsMoniteur(ctx context.Context, moniteurID int) ([]models.StatutMoniteur, error) {
     const requete = `
         SELECT moniteur_id, url, est_disponible, code_http, message_erreur, latence_ms, verifie_a
-        FROM statuts
+        FROM monitoring.statuts
         WHERE moniteur_id = $1
         ORDER BY verifie_a DESC
     `
@@ -184,17 +184,19 @@ func (p *Postgres) DerniersStatutsMoniteur(ctx context.Context, moniteurID int) 
 }
 
 // Helpers pour gérer valeurs NULL PostgreSQL
-
-func valeurNullInt64(v int64) any {
-    if v == 0 {
-        return nil
-    }
-    return v
-}
 func valeurNullString(v string) any {
     if v == "" {
         return nil
     }
     return v
+}
+
+// ViderTout supprime toutes les données (statuts puis moniteurs) et réinitialise les séquences.
+func (p *Postgres) ViderTout(ctx context.Context) error {
+    // Utiliser TRUNCATE sur les tables du schéma monitoring
+    _, err := p.db.ExecContext(ctx, `
+        TRUNCATE TABLE monitoring.statuts, monitoring.moniteurs RESTART IDENTITY CASCADE;
+    `)
+    return err
 }
 

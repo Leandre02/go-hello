@@ -9,6 +9,7 @@ package repos
 
 import (
 	"context"
+
 	"example.com/go-hello/src/internal/models"
 )
 
@@ -22,4 +23,7 @@ type Repo interface {
 	// StatutMoniteur
 	EnregistrerStatutMoniteur(ctx context.Context, statut models.StatutMoniteur) error               // Ajouter un statut de moniteur
 	DerniersStatutsMoniteur(ctx context.Context, moniteurID int) ([]models.StatutMoniteur, error)  // Lister tous les statuts d'un moniteur
+
+	// Administration
+	ViderTout(ctx context.Context) error // Supprime toutes les données (moniteurs et statuts)
 }

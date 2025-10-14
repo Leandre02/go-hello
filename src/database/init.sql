@@ -54,3 +54,5 @@ ORDER BY s.moniteur_id, s.verifie_a DESC;
 
 -- (optionnel) Définir le search_path pour cette session
 -- SET search_path TO monitoring, public;
+ALTER ROLE postgres IN DATABASE monitoring_database
+SET search_path = monitoring, public;

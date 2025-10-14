@@ -9,18 +9,18 @@
 package routes
 
 import (
-    "context"
-    "encoding/json"
-    "errors"
-    "net/http"
-    "sort"
-    "strconv"
-    "strings"
-    "time"
+	"context"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
 
-    "example.com/go-hello/src/internal/models"
-    "example.com/go-hello/src/internal/services"
-    "example.com/go-hello/src/repos"
+	"example.com/go-hello/src/internal/models"
+	"example.com/go-hello/src/internal/services"
+	"example.com/go-hello/src/repos"
 )
 
 // Struct centrale des dépendances applicatives pour les routes
@@ -65,7 +65,7 @@ func ecrireJSON(w http.ResponseWriter, code int, v any) {
 // Active le support du CORS pour permettre les appels API depuis n'importe quel navigateur/client frontend
 func activerCORS(w http.ResponseWriter) {
     w.Header().Set("Access-Control-Allow-Origin", "*")
-    w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+    w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
     w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 }
 
@@ -123,6 +123,14 @@ func HandlerResultats(app ServicesApp) http.HandlerFunc {
         activerCORS(w)
         if r.Method == http.MethodOptions {
             w.WriteHeader(http.StatusNoContent)
+            return
+        }
+        if r.Method == http.MethodDelete {
+            if err := app.Depot.ViderTout(r.Context()); err != nil {
+                http.Error(w, err.Error(), http.StatusInternalServerError)
+                return
+            }
+            ecrireJSON(w, http.StatusOK, map[string]any{"ok": true})
             return
         }
 

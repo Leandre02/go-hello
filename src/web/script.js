@@ -179,9 +179,14 @@ formulaire.addEventListener('submit', async (e) => {
   }
 });
 
-btnVider.addEventListener('click', () => {
-  viderConsole();
-  afficherMessage('Console vidée.', 'info');
+btnVider.addEventListener('click', async () => {
+  try {
+    await appelAPI('/api/resultats', { method: 'DELETE' });
+    viderConsole();
+    afficherMessage('Base et console vidées.', 'ok');
+  } catch (err) {
+    afficherMessage(`Échec de la suppression: ${err.message}`, 'err');
+  }
 });
 
 // Au chargement : récupère les derniers résultats
