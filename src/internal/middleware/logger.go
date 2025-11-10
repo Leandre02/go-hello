@@ -1,91 +1,57 @@
-/*
- * Middleware pour la journalisation des requêtes HTTP
+/* Middleware pour logger les requêtes HTTP
  * Projet de session A25
- * Auteur : Leandre Kanmegne
- * Version : 1.0
- *
- * Cette fonction middleware intercepte chaque requête HTTP,
- * logge la méthode, le chemin, l'adresse IP de l'appelant,
- * la durée de traitement, et le statut de la réponse.
- *
- * Utile pour monitorer l'activité serveur et diagnostiquer les problèmes.
- Explications :
-
-Le middleware Journalisateur enveloppe le handler HTTP donné.
-
-Un wrapper leveledResponseWriter capture le code HTTP écrit dans la réponse.
-
-Le middleware logge la méthode HTTP, le chemin d’URL, l’adresse IP (prenant en compte le header X-Forwarded-For si présent), le statut HTTP, et le temps d’exécution.
-
-La sortie est au format simple pour être lisible dans les logs classiques ou systèmes agrégateurs.
-
-Tu peux enregistrer ce middleware chez ton mux ou serveur HTTP comme :
-
-go
-mux := http.NewServeMux()
-// Enregistrer routes...
-
-logMiddleware := middleware.Journalisateur(mux)
-http.ListenAndServe(":8080", logMiddleware)
-Cette approche est conforme aux bonnes pratiques actuelles de middleware Go. N’hésite pas à demander pour une version plus avancée avec plus de métadonnées ou sorties JSON structurées./*
-
-Middleware pour la journalisation des requêtes HTTP
-
-Projet de session A25
-
-Auteur : Leandre Kanmegne
-
-Version : 1.0
-
-Cette fonction middleware intercepte chaque requête HTTP,
-
-logge la méthode, le chemin, l'adresse IP de l'appelant,
-
-la durée de traitement, et le statut de la réponse.
-
-Utile pour monitorer l'activité serveur et diagnostiquer les problèmes.
-*/
+ * By : Leandre Kanmegne
+ * 
+ * Intercepte chaque requête et log la méthode, URL, IP, durée et statut HTTP
+ * Utilise un wrapper (http.ResponseWriter) pour capturer le code de statut HTTP
+ * http.ResponseWriter est un objet pour écrire les réponses HTTP en Go
+ * Retourne un handler HTTP (fonction) qui peut être utilisé dans la chaîne de middleware pour permettre le logging
+ * récupère l'IP réelle du client si derrière un proxy (serveur intermédiaire) via l'en-tête X-Forwarded-For
+ */
 package middleware
 
 import (
-"log"
-"net/http"
-"time"
+	"log"
+	"net/http"
+	"time"
 )
 
-// Journalisateur est un middleware HTTP qui logge les requêtes et leur durée.
+// Journalisateur des requêtes HTTP
 func Journalisateur(next http.Handler) http.Handler {
-return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-debut := time.Now()
-    // wrapper pour capturer le code HTTP retourné
-    lrw := &leveledResponseWriter{ResponseWriter: w, statusCode: http.StatusOK}
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		debut := time.Now()
 
-    // Appel du handler principal
-    next.ServeHTTP(lrw, r)
-    
-    duree := time.Since(debut)
+		// wrapper pour capturer le code HTTP
+		wrapper := &wrapperReponse{ResponseWriter: w, statusCode: http.StatusOK}
 
-    ip := r.RemoteAddr
-    if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
-        ip = forwarded
-    }
+		// appel du handler
+		next.ServeHTTP(wrapper, req)
 
-    log.Printf("%s %s %s %d %s\n",
-        r.Method,
-        r.URL.Path,
-        ip,
-        lrw.statusCode,
-        duree)
-})
+		duree := time.Since(debut)
+
+		// récupère l'IP réelle si derrière un proxy
+		ip := req.RemoteAddr
+		if forwarded := req.Header.Get("X-Forwarded-For"); forwarded != "" {
+			ip = forwarded
+		}
+
+		log.Printf("%s %s %s %d %s\n",
+			req.Method,
+			req.URL.Path,
+			ip,
+			wrapper.statusCode,
+			duree)
+	})
 }
 
-// leveledResponseWriter permet de capturer le code HTTP écrit dans la réponse
-type leveledResponseWriter struct {
-http.ResponseWriter
-statusCode int
+// Capture le code HTTP écrit
+type wrapperReponse struct {
+	http.ResponseWriter
+	statusCode int
 }
 
-func (lrw *leveledResponseWriter) WriteHeader(code int) {
-lrw.statusCode = code
-lrw.ResponseWriter.WriteHeader(code)
+// Capture le code de statut HTTP
+func (w *wrapperReponse) WriteHeader(code int) {
+	w.statusCode = code
+	w.ResponseWriter.WriteHeader(code)
 }

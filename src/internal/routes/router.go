@@ -1,9 +1,19 @@
-/*
- * Routes HTTP du serveur (MVP francophone)
+/* Routes HTTP du serveur
+ * Projet de session A25
  * By : Leandre Kanmegne
- * Version : 1.0
- * Commentaires : Organisation inspirée des meilleures pratiques Go
- * Source : dev.to/kengowada/go-routing-101-handling-and-grouping-routes-with-nethttp-4k0e [web:25]
+ * 
+ * Définit les endpoints de l'API REST pour le monitoring
+ * - /api/verifier : vérifie une URL donnée
+ * - /api/resultats : récupère les derniers statuts des moniteurs
+ * - /api/etat : check de santé du serveur
+ * Utilise le package net/http de Go pour gérer les routes et les handlers
+ * Utilise le package context pour gérer les délais d'attente et annulations
+ * Utilise le package encoding/json pour sérialiser/désérialiser les données JSON
+ * Utilise le package sync pour gérer la concurrence
+ * Se sert du mux de net/http pour router les requêtes
+ * 
+ * Source:
+ * https://dev.to/kengowada/go-routing-101-handling-and-grouping-routes-with-nethttp-4k0e
  */
 
 package routes
@@ -23,174 +33,192 @@ import (
 	"example.com/go-hello/src/repos"
 )
 
-// Struct centrale des dépendances applicatives pour les routes
+// Regroupe les dépendances de l'app
 type ServicesApp struct {
-    Depot repos.Repo // Interface de persistance des moniteurs et statuts
+	Depot repos.Repo
 }
 
-// Représente le corps attendu pour les vérifications d'URL
+// Représente le body pour vérifier une URL
 type RequeteVerification struct {
-    URL string `json:"url"`
+	URL string `json:"url"`
 }
 
-// Structure utilisée pour exposer les statuts à l'extérieur (API REST)
+// Représente un statut pour l'API
 type StatutVue struct {
-    EstDisponible bool      `json:"est_disponible"`
-    CodeHTTP      int       `json:"code_http"`
-    LatenceMs     int64     `json:"latence_ms"`
-    MessageErreur string    `json:"message_erreur"`
-    VerifieA      time.Time `json:"verifie_a"`
-    URL           string    `json:"url"`
+	EstDisponible bool      `json:"est_disponible"`
+	CodeHTTP      int       `json:"code_http"`
+	LatenceMs     int64     `json:"latence_ms"`
+	MessageErreur string    `json:"message_erreur"`
+	VerifieA      time.Time `json:"verifie_a"`
+	URL           string    `json:"url"`
 }
 
-// Convertit un modèle métier StatutMoniteur en vue API StatutVue, facilitant le découplage métier/exposition
-func vueDepuisModele(s models.StatutMoniteur) StatutVue {
-    return StatutVue{
-        EstDisponible: s.EstDisponible,
-        CodeHTTP:      s.CodeStatutHTTP,
-        LatenceMs:     s.Latence.Milliseconds(),
-        MessageErreur: s.MessageErreur,
-        VerifieA:      s.VerifieA,
-        URL:           s.URL,
-    }
+// Convertit un StatutMoniteur en StatutVue
+func vueDepuisModele(statut models.StatutMoniteur) StatutVue {
+	return StatutVue{
+		EstDisponible: statut.EstDisponible,
+		CodeHTTP:      statut.CodeStatutHTTP,
+		LatenceMs:     statut.Latence.Milliseconds(),
+		MessageErreur: statut.MessageErreur,
+		VerifieA:      statut.VerifieA,
+		URL:           statut.URL,
+	}
 }
 
-// Permet d'envoyer une réponse JSON au client, en garantissant le bon format et le code HTTP
-func ecrireJSON(w http.ResponseWriter, code int, v any) {
-    w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(code)
-    _ = json.NewEncoder(w).Encode(v)
+// Envoie une réponse JSON
+func ecrireJSON(w http.ResponseWriter, code int, data any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(data)
 }
 
-// Active le support du CORS pour permettre les appels API depuis n'importe quel navigateur/client frontend
+// Active CORS pour permettre les appels depuis n'importe quel client
 func activerCORS(w http.ResponseWriter) {
-    w.Header().Set("Access-Control-Allow-Origin", "*")
-    w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
-    w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 }
 
-// Ajoute le moniteur pour l'URL spécifiée s'il n'existe pas encore, retourne l'identifiant du moniteur
+// Récupère ou crée l'ID d'un moniteur
 func obtenirIDMoniteur(ctx context.Context, depot repos.Repo, url string) (int, error) {
-    _ = depot.AjouterMoniteur(ctx, models.Moniteur{URL: url, Nom: url, Type: "http"})
-    mons, err := depot.ListerMoniteurs(ctx)
-    if err != nil {
-        return 0, err
-    }
-    for _, m := range mons {
-        if m.URL == url {
-            return m.ID, nil
-        }
-    }
-    return 0, errors.New("moniteur introuvable après ajout")
+	depot.AjouterMoniteur(ctx, models.Moniteur{URL: url, Nom: url, Type: "http"})
+	
+	moniteurs, err := depot.ListerMoniteurs(ctx)
+	if err != nil {
+		return 0, err
+	}
+	
+	for _, moniteur := range moniteurs {
+		if moniteur.URL == url {
+			return moniteur.ID, nil
+		}
+	}
+	
+	return 0, errors.New("moniteur introuvable après ajout")
 }
 
-// Handler de vérification de disponibilité : reçoit une URL, effectue un check, stocke le résultat, et retourne le statut
+// Check une URL et retourne le résultat
 func HandlerVerification(app ServicesApp) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        activerCORS(w)
-        if r.Method == http.MethodOptions {
-            w.WriteHeader(http.StatusNoContent)
-            return
-        }
+	return func(w http.ResponseWriter, req *http.Request) {
+		activerCORS(w)
+		
+		if req.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 
-        r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
-        defer r.Body.Close()
+		// limite la taille du body
+		req.Body = http.MaxBytesReader(w, req.Body, 1<<20)
+		defer req.Body.Close()
 
-        var reqBody RequeteVerification
-        if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil || strings.TrimSpace(reqBody.URL) == "" {
-            http.Error(w, "Corps invalide: attendu {\"url\":\"...\"}", http.StatusBadRequest)
-            return
-        }
+		var body RequeteVerification
+		if err := json.NewDecoder(req.Body).Decode(&body); err != nil || strings.TrimSpace(body.URL) == "" {
+			http.Error(w, "Corps invalide: attendu {\"url\":\"...\"}", http.StatusBadRequest)
+			return
+		}
 
-        ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
-        defer cancel()
+		ctx, cancel := context.WithTimeout(req.Context(), 15*time.Second)
+		defer cancel()
 
-        statut := services.VerifierURL(ctx, reqBody.URL)
-        if id, err := obtenirIDMoniteur(ctx, app.Depot, statut.URL); err == nil {
-            statut.MoniteurID = id
-            _ = app.Depot.EnregistrerStatutMoniteur(ctx, statut)
-        }
+		statut := services.VerifierURL(ctx, body.URL)
+		
+		// enregistre dans la BD si possible
+		if id, err := obtenirIDMoniteur(ctx, app.Depot, statut.URL); err == nil {
+			statut.MoniteurID = id
+			app.Depot.EnregistrerStatutMoniteur(ctx, statut)
+		}
 
-       ecrireJSON(w, http.StatusOK, map[string]any{
-           "statut": vueDepuisModele(statut),
-       })
-    }
+		ecrireJSON(w, http.StatusOK, map[string]any{
+			"statut": vueDepuisModele(statut),
+		})
+	}
 }
 
-// Handler pour récupérer les derniers statuts des moniteurs (attend un paramètre facultatif 'limit')
+// Récupère les derniers statuts
 func HandlerResultats(app ServicesApp) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        activerCORS(w)
-        if r.Method == http.MethodOptions {
-            w.WriteHeader(http.StatusNoContent)
-            return
-        }
-        if r.Method == http.MethodDelete {
-            if err := app.Depot.ViderTout(r.Context()); err != nil {
-                http.Error(w, err.Error(), http.StatusInternalServerError)
-                return
-            }
-            ecrireJSON(w, http.StatusOK, map[string]any{"ok": true})
-            return
-        }
+	return func(w http.ResponseWriter, req *http.Request) {
+		activerCORS(w)
+		
+		if req.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		
+		if req.Method == http.MethodDelete {
+			if err := app.Depot.ViderTout(req.Context()); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			ecrireJSON(w, http.StatusOK, map[string]any{"ok": true})
+			return
+		}
 
-        mons, err := app.Depot.ListerMoniteurs(r.Context())
-        if err != nil {
-            http.Error(w, err.Error(), http.StatusInternalServerError)
-            return
-        }
-        var tous []models.StatutMoniteur
-        for _, m := range mons {
-            s, err := app.Depot.DerniersStatutsMoniteur(r.Context(), m.ID)
-            if err == nil {
-                tous = append(tous, s...)
-            }
-        }
-        sort.Slice(tous, func(i, j int) bool { return tous[i].VerifieA.After(tous[j].VerifieA) })
+		moniteurs, err := app.Depot.ListerMoniteurs(req.Context())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		
+		var tousStatuts []models.StatutMoniteur
+		for _, moniteur := range moniteurs {
+			statuts, err := app.Depot.DerniersStatutsMoniteur(req.Context(), moniteur.ID)
+			if err == nil {
+				tousStatuts = append(tousStatuts, statuts...)
+			}
+		}
+		
+		// tri par date décroissante
+		sort.Slice(tousStatuts, func(i, j int) bool {
+			return tousStatuts[i].VerifieA.After(tousStatuts[j].VerifieA)
+		})
 
-        limite := 50
-        if v := r.URL.Query().Get("limit"); v != "" {
-            if n, err := strconv.Atoi(v); err == nil && n > 0 {
-                limite = n
-            }
-        }
-        if limite > len(tous) {
-            limite = len(tous)
-        }
-        selection := tous[:limite]
+		// limite le nombre de résultats
+		limite := 50
+		if valeur := req.URL.Query().Get("limit"); valeur != "" {
+			if n, err := strconv.Atoi(valeur); err == nil && n > 0 {
+				limite = n
+			}
+		}
+		if limite > len(tousStatuts) {
+			limite = len(tousStatuts)
+		}
+		
+		selection := tousStatuts[:limite]
 
-        vues := make([]StatutVue, 0, len(selection))
-        for _, s := range selection {
-            vues = append(vues, vueDepuisModele(s))
-        }
-        ecrireJSON(w, http.StatusOK, map[string]any{
-            "resultats": vues,
-        })
-    }
+		vues := make([]StatutVue, 0, len(selection))
+		for _, statut := range selection {
+			vues = append(vues, vueDepuisModele(statut))
+		}
+		
+		ecrireJSON(w, http.StatusOK, map[string]any{
+			"resultats": vues,
+		})
+	}
 }
 
-// Handler de santé de l'application, utilisé pour les probes ou monitorings externes
+// Check de santé du serveur
 func HandlerEtatApplication() http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        activerCORS(w)
-        if r.Method == http.MethodOptions {
-            w.WriteHeader(http.StatusNoContent)
-            return
-        }
-        w.WriteHeader(http.StatusOK)
-        w.Write([]byte("OK"))
-    }
+	return func(w http.ResponseWriter, req *http.Request) {
+		activerCORS(w)
+		
+		if req.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	}
 }
 
-// EnregistrerRoutes enregistre les handlers et RETOURNE un http.Handler.
+// Configure les routes HTTP
 func EnregistrerRoutes(app ServicesApp) http.Handler {
+	mux := http.NewServeMux()
 
-    routes := http.NewServeMux() // Utilisation d'un ServeMux pour un routage simple 
+	mux.HandleFunc("/api/verifier", HandlerVerification(app))
+	mux.HandleFunc("/api/resultats", HandlerResultats(app))
+	mux.HandleFunc("/api/etat", HandlerEtatApplication())
+	mux.Handle("/", http.FileServer(http.Dir("/web")))
 
-    routes.HandleFunc("/api/verifier", HandlerVerification(app))
-    routes.HandleFunc("/api/resultats", HandlerResultats(app))
-    routes.HandleFunc("/api/etat", HandlerEtatApplication())
-    
-    routes.Handle("/", http.FileServer(http.Dir("/web")))
-    return routes
+	return mux
 }

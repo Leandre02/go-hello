@@ -1,52 +1,10 @@
 /* Point d'entrée du serveur HTTP
-* Objectif MVP: un service de monitoring simple et clair
-* Résumé concret de ton projet de monitoring en Go
-Ton projet contient plusieurs fichiers clés, chacun avec un rôle précis, ensemble formant une architecture claire, maintenable et évolutive selon les meilleures pratiques Go récentes.
-
-1. Types et modèles (models/)
-Définissent les structures de données métier : Moniteur, StatutMoniteur, Alertes.
-
-Fournissent la base de tout le traitement en garantissant une typage clair.
-
-2. Repository PostgreSQL (pg.go dans repos/)
-Interface avec la base PostgreSQL via pgx, gérant le CRUD des moniteurs et le stockage des statuts.
-
-Assure une abstraction de la persistance avec contexte, pool et gestion des NULL explicites.
-
-3. Service métier (monitor.go, notifier.go, scheduler.go dans services/)
-ServiceMoniteur contient la logique de vérification HTTP robuste, gestion des timeout, client personnalisé et parallélisme contrôlé.
-
-ServiceNotifications génère les alertes à partir des statuts, avec sévérité et messages détaillés; elle peut notifier via logs ou se connecter à d’autres systèmes.
-
-Planificateur orchestre le lancement périodique des vérifications, garantissant un monitoring continu et fiable.
-
-4. Routes HTTP (routes.go)
-Sont les points d’entrée exposés aux clients, transformant requêtes en appels métier, puis formatant les réponses JSON.
-
-Utilise une structure ServicesApp injectant les dépendances comme Repo et ServiceMoniteur.
-
-Applique la gestion CORS, la validation et traite les contextes HTTP.
-
-5. Middleware (middleware.go)
-Intercepte les requêtes HTTP pour journaliser méthode, URL, temps de traitement, et code HTTP.
-
-Utile pour surveillance, analyse de performance et diagnostics.
-
-Pourquoi ces fichiers ?
-Séparation claire des responsabilités, appliquant l’architecture propre (Clean/Hexagonal) pour la clarté, testabilité et maintenabilité.
-
-Couche modèle gère la définition des données.
-
-Repository isole la persistance des règles métier.
-
-Services métier contiennent la logique centrale, indépendamment des détails techniques externes.
-
-Routes adaptent cette logique aux requêtes HTTP.
-
-Middleware améliore la qualité opérationnelle.
-
-Cette organisation facilite l’évolution future, l’extension fonctionnelle ou technique, et le travail collaboratif grace à des conventions claires et des interfaces stables.
-*/
+ * Projet de session A25
+ * By : Leandre Kanmegne
+ * 
+ * Lance le serveur HTTP et gère l'arrêt avec les signaux système
+ * Point d'entrée principal de l'application
+ */
 
 package main
 
@@ -63,61 +21,61 @@ import (
 	"example.com/go-hello/src/repos"
 )
 
-// fonction main : initialisation et lancement du serveur HTTP
 func main() {
-    // DSN PostgreSQL 
-    dsn := os.Getenv("DATABASE_URL")
-    if dsn == "" {
-        log.Println("[ERREUR] DATABASE_URL non défini: passer -e DATABASE_URL=... au docker run, ou définir la variable d'environnement avant d'exécuter.")
-    }
+	// récupère l'URL de connexion PostgreSQL
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		log.Println("[ERREUR] DATABASE_URL non défini dans les variables d'environnement")
+		log.Fatal("Impossible de démarrer sans connexion à la base de données")
+	}
 
-    // Initialisation du dépôt PostgreSQL
-    depot, err := repos.NouvelleConnexion(dsn)
-    if err != nil {
-        log.Fatalf("Erreur connexion base de données : %v", err)
-    }
-    defer func() {
-        if cerr := depot.Fermer(); cerr != nil {
-            log.Printf("Erreur fermeture base : %v", cerr)
-        }
-    }()
+	// connexion à PostgreSQL
+	depot, err := repos.NouvelleConnexion(dsn)
+	if err != nil {
+		log.Fatalf("Erreur connexion base de données : %v", err)
+	}
+	defer func() {
+		if errFermeture := depot.Fermer(); errFermeture != nil {
+			log.Printf("Erreur fermeture base : %v", errFermeture)
+		}
+	}()
 
-    // Injection des dépendances au router (app agrégé)
-    app := routes.ServicesApp{
-        Depot: depot,
-    }
+	// setup de l'application avec les dépendances
+	app := routes.ServicesApp{
+		Depot: depot,
+	}
 
-    // Création du router avec injection du dépôt
-    mux := routes.EnregistrerRoutes(app)
+	// création du router HTTP
+	mux := routes.EnregistrerRoutes(app)
 
-    // Configuration d'un contexte pour gérer l'arrêt propre
-    ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-    defer stop()
+	// contexte pour gérer l'arrêt propre
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
-    srv := &http.Server{
-        Addr:    ":8080",
-        Handler: mux,
-    }
+	serveur := &http.Server{
+		Addr:    ":8080",
+		Handler: mux,
+	}
 
-    // Démarrage du serveur HTTP dans une goroutine pour permettre un arrêt propre
-    go func() {
-        log.Println("Serveur démarré sur :8080")
-        if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-            log.Fatalf("Erreur démarrage serveur : %v", err)
-        }
-    }()
+	// démarrage du serveur dans une goroutine
+	go func() {
+		log.Println("Serveur démarré sur :8080")
+		if err := serveur.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Erreur démarrage serveur : %v", err)
+		}
+	}()
 
-    // Attente du signal d'interruption ou FIN
-    <-ctx.Done()
-    log.Println("Arrêt du serveur...")
+	// attente du signal d'interruption
+	<-ctx.Done()
+	log.Println("Arrêt du serveur en cours...")
 
-    // Timeout pour arrêt gracieux
-    ctxShutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-    defer cancel()
+	// timeout pour l'arrêt gracieux
+	ctxShutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-    if err := srv.Shutdown(ctxShutdown); err != nil {
-        log.Fatalf("Erreur lors de l'arrêt du serveur : %v", err)
-    }
+	if err := serveur.Shutdown(ctxShutdown); err != nil {
+		log.Fatalf("Erreur lors de l'arrêt du serveur : %v", err)
+	}
 
-    log.Println("Serveur arrêté proprement")
+	log.Println("Serveur arrêté !!!")
 }

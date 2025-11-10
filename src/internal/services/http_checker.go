@@ -1,7 +1,10 @@
 /* Service de vérification HTTP simple
-* - Timeouts raisonnables
-* - Lecture limitée du corps de réponse
-* - Noms en français et commentaires clairs
+ * Projet de session A25
+ * By : Leandre Kanmegne
+ * 
+ * Fait un GET sur une URL et retourne le statut
+ * Gère les erreurs réseau et les codes HTTP
+ * Limite la taille de la réponse luee pour éviter d'abuser de la mémoire
  */
 package services
 
@@ -15,9 +18,9 @@ import (
 	"example.com/go-hello/src/internal/models"
 )
 
-// VerifierURL effectue une requête GET avec timeout et renvoie un StatutMoniteur.
+// VerifierURL fait une requête GET et retourne le statut
 func VerifierURL(ctx context.Context, url string) models.StatutMoniteur {
-	// Normaliser l'URL (ajouter http:// si manquant)
+	// ajoute http:// si manquant
 	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
 		url = "http://" + url
 	}
@@ -26,32 +29,33 @@ func VerifierURL(ctx context.Context, url string) models.StatutMoniteur {
 
 	debut := time.Now()
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	req.Header.Set("User-Agent", "MoniteurMVP/1.0") // User-Agent personnalisé
+	req.Header.Set("User-Agent", "MoniteurMVP/1.0")
 
-	r := models.StatutMoniteur{
+	statut := models.StatutMoniteur{
 		URL:      url,
 		VerifieA: time.Now(),
 	}
 
-	rep, err := client.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
-		r.EstDisponible = false
-		r.MessageErreur = err.Error()
-		r.CodeStatutHTTP = 0
-		r.Latence = time.Since(debut)
-		return r
+		// erreur réseau
+		statut.EstDisponible = false
+		statut.MessageErreur = err.Error()
+		statut.CodeStatutHTTP = 0
+		statut.Latence = time.Since(debut)
+		return statut
 	}
-	defer rep.Body.Close()
+	defer resp.Body.Close()
 
-	// Limiter la lecture du corps pour éviter les abus (512 Ko)
-	const limite = 512 * 1024
-	_, _ = io.Copy(io.Discard, io.LimitReader(rep.Body, limite))
+	// limite la lecture pour pas abuser
+	io.Copy(io.Discard, io.LimitReader(resp.Body, 512*1024))
 
-	r.CodeStatutHTTP = rep.StatusCode
-	r.Latence = time.Since(debut)
-	r.EstDisponible = rep.StatusCode >= 200 && rep.StatusCode < 400
-	if !r.EstDisponible {
-		r.MessageErreur = http.StatusText(rep.StatusCode)
+	statut.CodeStatutHTTP = resp.StatusCode
+	statut.Latence = time.Since(debut)
+	statut.EstDisponible = resp.StatusCode >= 200 && resp.StatusCode < 400
+	if !statut.EstDisponible {
+		statut.MessageErreur = http.StatusText(resp.StatusCode)
 	}
-	return r
+
+	return statut
 }

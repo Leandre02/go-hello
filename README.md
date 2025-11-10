@@ -1,321 +1,296 @@
-/_ Fonctionnalités du service de monitoring _/
+# Service de Monitoring
 
-- Surveiller l'état des services (HTTP, TCP, ICMP)
-- Enregistrer les résultats des vérifications dans une base de données
-- Alerter en cas de panne ( code d'erreur 404, 500, etc. ) ( A venir ) via des Regex
-- Fournir des statistiques de performance
-- Interface web pour visualiser les données
-- API REST pour intégration avec d'autres systèmes
-- Authentification et autorisation des utilisateurs ( A venir)
+Projet de session A25  
+Par : Leandre Kanmegne
 
-/_ Technologies utilisées _/
+## 📋 Description
 
-- Langage de programmation : Go
-- Base de données : PostgreSQL
-- Framework web : net/http (standard library)
-- Outils de développement : Air (rechargement automatique), Docker (conteneurisation)
-- Frontend : HTML, CSS, JavaScript (A venir)
-- Regex (A venir)
+Service de monitoring simple qui vérifie automatiquement l'état de sites web et APIs. L'outil check régulièrement l'accessibilité et la rapidité de réponse des différents services, puis expose les résultats via une API REST et une interface web.
 
-/_ Matrice d'Eisenhower _/
+## ✨ Fonctionnalités
 
-- Important et Urgent : Connexion à la base de données, Vérification des services, Enregistrement des résultats
-- Important mais pas Urgent : Interface web, API REST, Authentification ( A venir )
-- Pas Important mais Urgent : Configuration de l'environnement de développement, Tests unitaires
-- Pas Important et pas Urgent : Alerte avancée, Statistiques détaillées
+- ✅ Surveillance des services (HTTP, TCP, ICMP)
+- ✅ Enregistrement des résultats dans PostgreSQL
+- ✅ Alertes automatiques en cas de panne (codes 404, 500, etc.)
+- ✅ Statistiques de performance (latence, disponibilité)
+- ✅ Interface web pour visualiser les données
+- ✅ API REST pour intégration avec d'autres systèmes
+- 🔜 Authentification et autorisation (à venir)
+- 🔜 Alertes avancées avec regex (à venir)
 
-/_ Architecture du projet _/
--- Source d'inspiration : https://github.com/prometheus/prometheus
--- Modele de disposition : https://github.com/golang-standards/project-layout
+## 🛠️ Technologies utilisées
 
--- Source note de cours : https://www.w3schools.com/go/index.php
+- **Langage** : Go 1.23
+- **Base de données** : PostgreSQL 16
+- **Framework web** : net/http (standard library)
+- **Driver BD** : pgx v5
+- **Développement** : Air (rechargement auto), Docker
+- **Frontend** : HTML, CSS, JavaScript vanilla
 
--- Synthaxe de Go : https://www.w3schools.com/go/go_formatting_verbs.php
+## 📁 Architecture du projet
 
--- Les tableaux en Go :https://www.w3schools.com/go/go_arrays.php
+/
+├── main.go                          # Point d'entrée
+├── .env.example                     # Variables d'environnement
+├── docker-compose*.yml              # Config Docker
+├── src/
+│   ├── internal/
+│   │   ├── models/
+│   │   │   └── types.go            # Structures de données
+│   │   ├── routes/
+│   │   │   └── router.go           # Routes HTTP
+│   │   ├── services/
+│   │   │   ├── http_checker.go    # Vérification HTTP simple
+│   │   │   ├── monitor.go         # Service de monitoring avancé
+│   │   │   ├── notifier.go        # Système d'alertes
+│   │   │   └── scheduler.go       # Planificateur auto
+│   │   └── middleware/
+│   │       └── logger.go           # Logging des requêtes
+│   ├── repos/
+│   │   ├── repo.go                 # Interface repository
+│   │   └── pg.go                   # Implémentation PostgreSQL
+│   └── database/
+│       ├── init.sql                # Schéma de base
+│       └── dbtrigger.sql           # Triggers et alertes
+└── web/
+    ├── index.html                   # Interface utilisateur
+    ├── script.js                    # Logique frontend
+    └── styles.css                   # Styles
 
--- Le context : https://pkg.go.dev/golang.org/x/net/context
 
-/_ Definition des concepts techniques de Go _/
+## 🚀 Installation et démarrage
 
-## 🔧 Concepts fondamentaux
+### Prérequis
 
-### Le Context
+- Docker et Docker Compose
+- Go 1.23+ (pour développement local)
+- PostgreSQL 16 (si hors Docker)
 
-Le context est un package qui permet de gérer l'annulation, les timeouts et la transmission de valeurs à travers les goroutines. Dans notre projet de monitoring, il est essentiel pour :
+### Démarrage rapide avec Docker
 
-- Gérer les timeouts des requêtes HTTP vers les services surveillés
-- Annuler les vérifications en cours si nécessaire
-- Transmettre des métadonnées comme les identifiants de requête
+1. **Cloner le projet**
 
-**Exemple d'utilisation :**
+   git clone <url-du-projet>
+   cd go-hello
 
-```go
-ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-defer cancel()
-resp, err := http.Get(moniteur.URL) // Utilise le context pour timeout
-```
 
-### Une Goroutine
+2. **Configurer les variables d'environnement**
 
-C'est une fonction qui s'exécute de manière concurrente (en parallèle) avec d'autres goroutines. Les goroutines sont légères et permettent de surveiller plusieurs services simultanément sans bloquer l'application principale.
+   cp .env.example .env
+   # Éditer .env avec vos valeurs
 
-**Dans notre monitoring :**
 
-- Chaque vérification de service peut s'exécuter dans sa propre goroutine
-- Permet de surveiller des centaines de services en parallèle
-- Utilise beaucoup moins de mémoire qu'un thread traditionnel
+3. **Lancer avec Docker Compose**
 
-### Les Channels
 
-Les channels sont des "tuyaux" qui permettent aux goroutines de communiquer entre elles de manière sûre. Ils permettent d'échanger des données sans risque de corruption.
+   # Mode développement (avec rechargement auto)
+   docker-compose -f docker-compose.dev.yml up
 
-**Utilisation dans le monitoring :**
 
-```go
-resultChan := make(chan StatutMoniteur, 100)
-// Une goroutine envoie les résultats
-go func() { resultChan <- statut }()
-// Une autre goroutine reçoit et traite
-statut := <-resultChan
-```
 
-### Les Interfaces
+4. **Accéder à l'application**
+   - Interface web : http://localhost:8080
+   - API : http://localhost:8080/api/
+   - PostgreSQL : localhost:5432
 
-Une interface définit un contrat (ensemble de méthodes) qu'un type doit respecter. Elle permet une programmation flexible et modulaire.
+### Développement local (sans Docker)
 
-**Exemple dans notre projet :**
+1. **Démarrer PostgreSQL**
 
-```go
-type Checker interface {
-    Check(ctx context.Context, url string) (StatutMoniteur, error)
+   docker run --name monitoring_postgres \
+     -e POSTGRES_PASSWORD=postgres \
+     -e POSTGRES_DB=monitoring_database \
+     -p 5432:5432 -d postgres:16
+
+
+2. **Initialiser la base de données**
+
+   psql -h localhost -U postgres -d monitoring_database -f src/database/init.sql
+   psql -h localhost -U postgres -d monitoring_database -f src/database/dbtrigger.sql
+
+
+3. **Configurer les variables**
+
+   export DATABASE_URL="postgres://postgres:postgres@localhost:5432/monitoring_database?sslmode=disable"
+
+
+4. **Lancer l'application**
+
+   go run main.go
+
+
+## 📚 API Endpoints
+
+### POST /api/verifier
+Vérifie une URL et retourne son statut
+json
+Request:
+{
+  "url": "https://exemple.com"
 }
-// HTTPChecker, TCPChecker peuvent implémenter cette interface
-```
 
-### Les Structs
-
-Les structs sont des types personnalisés qui regroupent des données liées. Elles sont l'équivalent des classes dans d'autres langages.
-
-**Nos structs principales :**
-
-- `Moniteur` : Représente un service à surveiller
-- `StatutMoniteur` : Contient le résultat d'une vérification
-- `Alert` : Représente une alerte générée
-
-### Les Pointeurs
-
-Les pointeurs stockent l'adresse mémoire d'une variable plutôt que sa valeur. Ils permettent de modifier des données sans les copier.
-
-**Usage typique :**
-
-```go
-func (m *MonitorService) Check(moniteur *Moniteur) error {
-    // Le * permet de modifier directement l'objet
+Response:
+{
+  "statut": {
+    "est_disponible": true,
+    "code_http": 200,
+    "latence_ms": 123,
+    "verifie_a": "2025-01-10T14:30:00Z",
+    "url": "https://exemple.com"
+  }
 }
-```
 
-### Error Handling
 
-Go utilise des valeurs d'erreur explicites plutôt que des exceptions. Chaque fonction pouvant échouer retourne une erreur.
-
-**Pattern typique :**
-
-```go
-statut, err := checkService(url)
-if err != nil {
-    log.Printf("Erreur lors de la vérification: %v", err)
-    return err
+### GET /api/resultats?limit=50
+Récupère les derniers résultats
+json
+Response:
+{
+  "resultats": [
+    {
+      "est_disponible": true,
+      "code_http": 200,
+      "latence_ms": 123,
+      "verifie_a": "2025-01-10T14:30:00Z",
+      "url": "https://exemple.com"
+    }
+  ]
 }
-```
 
-### Les Packages
 
-Les packages organisent le code en modules réutilisables. Notre projet utilise :
+### DELETE /api/resultats
+Vide toutes les données (moniteurs et statuts)
 
-- `net/http` : Pour les requêtes HTTP
-- `database/sql` : Pour la base de données
-- `time` : Pour la gestion du temps
-- Nos packages internes : `models`, `services`, `repos`
+### GET /api/etat
+Health check du serveur
 
-### JSON Marshal/Unmarshal
+## 🗄️ Base de données
 
-Go peut automatiquement convertir des structs en JSON et vice-versa grâce aux tags.
+### Tables principales
 
-**Exemple :**
+**monitoring.moniteurs**
+- Stocke les services à surveiller
 
-```go
-type StatutMoniteur struct {
-    URL    string    `json:"url"`
-    Statut bool      `json:"statut"`
-    Date   time.Time `json:"date"`
-}
-```
+**monitoring.statuts**
+- Historique de toutes les vérifications
 
-### Les Slices
+**monitoring.alertes**
+- Alertes générées automatiquement par triggers
 
-Les slices sont des tableaux dynamiques qui peuvent grandir ou rétrécir selon les besoins.
+### Triggers
 
-**Usage dans le monitoring :**
+Le système détecte automatiquement les transitions UP/DOWN et génère des alertes dans la table `monitoring.alertes`.
 
-```go
-var moniteurs []Moniteur
-moniteurs = append(moniteurs, nouveauMoniteur)
-```
+## 📖 Concepts techniques Go
 
-## 🚀 Concepts avancés pour le monitoring
+### Context
+Gestion des timeouts et annulations dans les requêtes
+- Source : https://pkg.go.dev/context
 
-### Worker Pools
+### Goroutines et Channels
+Permet de surveiller plusieurs services en parallèle
+- Pattern de workers pour limiter la concurrence
 
-Pattern pour limiter le nombre de goroutines concurrentes et gérer la charge.
+### pgx Driver
+Driver PostgreSQL performant avec support natif des features avancées
+- Source : https://github.com/jackc/pgx
 
-### Rate Limiting
+### Repository Pattern
+Séparation claire entre logique métier et persistance
+- Source : https://threedots.tech/post/repository-pattern-in-go/
 
-Contrôler la fréquence des vérifications pour éviter de surcharger les services surveillés.
+## 🔧 Configuration avancée
 
-### Graceful Shutdown
+Toutes les configurations sont dans `.env` :
 
-Arrêter proprement l'application en terminant les vérifications en cours.
 
-### Middleware Pattern
+# Serveur
+PORT=8080
 
-Chaîner des fonctions pour ajouter des fonctionnalités (logging, auth, metrics).
+# Monitoring
+INTERVALLE_VERIFICATION_SECONDES=60
+WORKERS_MAX_PARALLELES=5
+SEUIL_LATENCE_LENTE_MS=800
 
-Ces concepts forment la base de notre architecture de monitoring robuste et performante !
+# Timeouts
+TIMEOUT_REQUETE_SECONDES=10
+TIMEOUT_ARRET_SERVEUR_SECONDES=5
 
-    --- A la racine du projet ---
 
-- main.go : point d'entrée de l'application
-- .air.toml : configuration pour le rechargement automatique lors du développement !important : c'est ici que je dois configurer le chemin vers le fichier main.go
-- go.mod : gestion des dépendances du projet
-- .gitignore : fichiers et dossiers à ignorer par Git
-- Readme.txt : documentation du projet
-- .dockerignore : fichiers et dossiers à ignorer par Docker
-- Dockerfile : instructions pour construire l'image Docker
+## 📝 Commandes Docker utiles
 
-  --- Dossier src : Dossier de rangement de mes sous-dossiers ---
-  --- Dossier src/database ---
+# Build l'image
+docker build -t monitoring:latest .
 
-- schema.sql : script SQL pour créer la base de données et les tables nécessaires
-- dbtrigger.sql : script SQL pour créer les triggers de la base de données
+# Lancer manuellement
+docker run -d --name monitoring \
+  -e DATABASE_URL="..." \
+  -p 8080:8080 monitoring:latest
 
-  --- Dossier src/models ---
+# Voir les logs
+docker logs -f monitoring
 
-- MoniteurModel.go : définit le modèle de données pour les moniteurs
+# Arrêter et supprimer
+docker stop monitoring && docker rm monitoring
 
-  --- Dossier src/repos ---
+# Nettoyer tout
+docker-compose down -v
 
-- pg.go : gestion de la connexion à la base de données PostgreSQL
-- MoniteurRepos.go : dépôt pour gérer les opérations sur les moniteurs
-- demo.go : code de démarrage pour le dépôt initial dans l'application
 
-  --- Dossier src/services ---
+## 🐛 Problèmes rencontrés et solutions
 
-- MoniteurService.go : service pour la logique métier liée aux moniteurs
-- Planificateur.go : service pour la planification automatique des tâches
+### Problème d'organisation
+- **Solution** : Création du dossier `src/` pour mieux ranger les fichiers
 
-  --- Dossier src/controllers ---
+### Air ne trouvait pas main.go
+- **Solution** : Configuration du chemin dans `.air.toml`
 
-- MoniteurController.go : contrôleur pour gérer les requêtes HTTP liées aux moniteurs
+### Connexion PostgreSQL échoue
+- **Solution** : Vérifier que `DATABASE_URL` est bien défini et que PostgreSQL est démarré
 
-  --- Dossier src/routes ---
+### Erreur "address already in use"
+- **Solution** : Arrêter le processus sur le port 8080 ou changer de port
 
-- MoniteurRoutes.go : définit les routes HTTP pour les moniteurs
+## 📚 Sources et références
 
-  --- Dossier src/middleware ---
-
-- AuthMiddleware.go : middleware pour l'authentification des utilisateurs ( A venir )
-
-  --- Dossier src/view ---
-
-- index.html : page HTML principale pour l'interface web
-- styles.css : styles CSS pour l'interface web
-- script.js : scripts JavaScript pour l'interface web
-
-/_ Source _/
-Notes de cours pour la BD PostgreSQL
-
-- https://www.w3schools.com/postgresql/postgresql_create_table.php
-- https://bd1.profinfo.ca/notes_de_cours/section_1.4/#afficher-les-tables
-- https://bd2.profinfo.ca/mysql/creation_table/#syntaxe-de-base
-- https://gowebexamples.com/hello-world/
-- https://www.postgresql.org/docs/9.1/datatype-numeric.html
-
-  --- Remarque importante sur les types de données Serial et Bigserial ---
-
-* Bigserial est spécifique à PostgreSQL et est utilisé pour les colonnes qui nécessitent des valeurs uniques et auto-incrémentées, souvent utilisées pour les clés primaires.
-* Bigserial permet de stocker des entiers auto-incrémentés de grande taille, allant de 1 à 9223372036854775807 vs Serial qui va de 1 à 2147483647.
-
-Notes de cours pour le langage Go
-
-- https://gowebexamples.com/hello-world/
-
-/_ Problematique rencontrée _/
-
-- Probleme d'organisation des fichiers (résolu en créant un dossier src pour ranger les sous-dossiers)
-- Problème avec Air : ne trouvait pas le fichier main.go (résolu en configurant le chemin dans .air.toml)
-- Problème avec la connexion à la base de données PostgreSQL (résolu en vérifiant les paramètres de connexion et en s'assurant que le service PostgreSQL est en cours d'exécution)
-
-
-
-
-
-Voici des explications claires sur les notions que tu as rencontrées dans ton code, avec un extrait et référence officielle pour chacune :
-
-1. pgx
-Qu'est-ce que pgx ?
-
-pgx est un pilote PostgreSQL écrit entièrement en Go. Il offre une interface native haute performance pour PostgreSQL, en exposant des fonctionnalités spécifiques à ce SGBD (comme LISTEN/NOTIFY, COPY), tout en pouvant également être utilisé comme driver compatible database/sql.
-
-Pourquoi l'utiliser ? - Pour un accès efficace à la base avec support spécialisé PostgreSQL.
-
-Extrait doc officielle :
-"pgx driver is a low-level, high performance interface that exposes PostgreSQL-specific features such as LISTEN/NOTIFY and COPY. It also includes an adapter for the standard database/sql interface."[pgx github officiel]
-
-2. context (abrégé ctx dans Go)
-Qu'est-ce que le contexte ?
-
-context.Context permet de transmettre autour d’une requête des informations comme un délai d’expiration (timeout), une annulation, et des métadonnées. Il est utilisé pour gérer proprement la durée de vie d’opérations asynchrones ou dépendantes de ressources.
-
-Pourquoi c’est important ?
-
-Cela permet d'éviter les fuites de goroutines, d'interrompre des requêtes longues, et de propager des signaux d’annulation dans toute la chaîne d’appels.
-
-Doc officielle :
-"The Context type carries deadlines, cancelation signals, and other request-scoped values across API boundaries and goroutines."[golang context pkg]
-
-3. Handler / HandlerFunc
-Définition :
-
-En Go, un Handler est une interface HTTP centrale qui gère une requête HTTP et prépare une réponse. Son rôle est d’exécuter la logique métier correspondante.
-
-Un HandlerFunc est une fonction avec la signature func(ResponseWriter, *Request) qui est convertible en Handler.
-
-Pourquoi utiliser ces abstractions ?
-
-Elles permettent de composer et d’enchaîner des traitements HTTP de façon propre et modulaire - comme un middleware ou un routeur.
-
-Doc officielle :
-"Handler is an interface that responds to an HTTP request. HandlerFunc is a type that allows using ordinary functions as HTTP handlers."[net/http package]
-
-Pour commencer avec pgx, voici un extrait d’exemple officiel :
-
-go
-conn, err := pgx.Connect(context.Background(), "postgres://user:pass@localhost/db")
-if err != nil {
-   // gérer erreur
-}
-defer conn.Close(context.Background())
-
-var name string
-err = conn.QueryRow(context.Background(), "SELECT name FROM table WHERE id=$1", 42).Scan(&name)
-Cela montre la liaison directe entre pgx, context, et les requêtes SQL.
-
-Sources :
-
-pgx GitHub - PostgreSQL Driver and Toolkit
-
-Go context package
-
-Go net/http package - Handler
-
+### Documentation Go
+- https://pkg.go.dev/context
+- https://golang.org/pkg/net/http
+- https://gowebexamples.com/
+
+### PostgreSQL et pgx
+- https://dev.to/mx_tech/go-with-postgresql-best-practices-for-performance-and-safety-47d7
+- https://betterstack.com/community/guides/scaling-go/postgresql-pgx-golang/
+- https://www.postgresql.org/docs/
+
+### Architecture et patterns
+- https://threedots.tech/post/repository-pattern-in-go/
+- https://github.com/golang-standards/project-layout
+- https://github.com/prometheus/prometheus (inspiration)
+
+### Monitoring et alerting
+- https://prometheus.io/docs/alerting/latest/overview/
+- https://middleware.io/blog/golang-monitoring/
+
+### Concurrence et scheduling
+- https://dev.to/jones_charles_ad50858dbc0/building-a-go-concurrency-task-scheduler-efficient-task-processing-unleashed-4fhg
+- https://nghiant3223.github.io/2025/04/15/go-scheduler.html
+
+### Routing HTTP
+- https://dev.to/kengowada/go-routing-101-handling-and-grouping-routes-with-nethttp-4k0e
+
+## 🎯 Prochaines étapes
+
+- [ ] Ajouter l'authentification JWT
+- [ ] Implémenter les alertes email/webhook
+- [ ] Ajouter support pour TCP et ICMP
+- [ ] Dashboard avec graphiques
+- [ ] Export des données (CSV, JSON)
+- [ ] API pour gérer les moniteurs (CRUD complet)
+- [ ] Tests unitaires et d'intégration
+- [ ] Déploiement sur Render ou autre service cloud
+
+## 📧 Contact
+
+Leandre Kanmegne  
+Projet de session A25

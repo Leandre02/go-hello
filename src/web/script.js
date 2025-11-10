@@ -1,9 +1,8 @@
-/* Les scripts JavaScript de la page d'accueil de mon service de monitoring */
-/* Script front du MVP de monitoring
- * - Envoie POST /api/check {url}
- * - Récupère GET /api/resultats?limit=50
- * - Affiche une “console” de pings (les plus récents en haut)
- * Noms FR + commentaires explicites.
+/* Scripts JavaScript du service de monitoring
+ * Projet de session A25
+ * By : Leandre Kanmegne
+ *
+ * Gère l'interface utilisateur et les appels API
  */
 
 const champURL = document.getElementById('champ-url');
@@ -18,33 +17,34 @@ const liste = document.getElementById('liste');
 const ligneVide = document.getElementById('ligne-vide');
 
 const LIMITE_PAR_DEFAUT = 50;
-const SEUIL_LENTE_MS = 800; // doit être cohérent avec le backend (variable d’env. SEUIL_LENTE_MS)
+const SEUIL_LENTE_MS = 800;
 let intervalId = null;
-let enCours = false; // anti-chevauchement
+let enCours = false;
 
-// -------- Utilitaires UI --------
-
+// affiche un message à l'utilisateur
 function afficherMessage(texte, type = 'info') {
   zoneMessage.textContent = texte || '';
   zoneMessage.className = `message ${type}`;
 }
 
+// vide la console des résultats
 function viderConsole() {
   liste.innerHTML = '';
   if (!document.getElementById('ligne-vide')) {
-    const v = document.createElement('div');
-    v.id = 'ligne-vide';
-    v.className = 'vide';
-    v.textContent = 'Aucun résultat pour l’instant.';
-    liste.parentElement.insertBefore(v, liste);
+    const vide = document.createElement('div');
+    vide.id = 'ligne-vide';
+    vide.className = 'vide';
+    vide.textContent = "Aucun résultat pour l'instant.";
+    liste.parentElement.insertBefore(vide, liste);
   }
 }
 
+// formate l'heure pour l'affichage
 function formaterHeure(dateISO) {
   try {
-    const d = new Date(dateISO);
-    if (isNaN(d.getTime())) throw new Error('invalid date');
-    return d.toLocaleTimeString([], {
+    const date = new Date(dateISO);
+    if (isNaN(date.getTime())) throw new Error('date invalide');
+    return date.toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
@@ -54,8 +54,9 @@ function formaterHeure(dateISO) {
   }
 }
 
+// crée une ligne de résultat dans la console
 function creerLigne(statut) {
-  // Supprime la ligne “vide” si c’est le premier résultat
+  // supprime la ligne vide si c'est le premier résultat
   const vide = document.getElementById('ligne-vide');
   if (vide) vide.remove();
 
@@ -68,7 +69,7 @@ function creerLigne(statut) {
     verifie_a,
   } = statut;
 
-  // Détermine le statut visuel (ok / warn / err)
+  // détermine le statut visuel
   let texteStatut = 'EN LIGNE';
   let classeStatut = 'ok';
   if (!est_disponible) {
@@ -90,15 +91,15 @@ function creerLigne(statut) {
     <div class="badge">${code_http ?? '—'}</div>
   `;
 
+  // ajoute le message d'erreur si présent
   if (!est_disponible && message_erreur) {
-    // Ajoute une sous-ligne compacte pour le message d’erreur
     const sous = document.createElement('div');
     sous.className = 'sous-ligne';
     sous.textContent = message_erreur;
     ligne.appendChild(sous);
   }
 
-  // Ajoute en tête (les plus récents en haut)
+  // ajoute en haut de la liste
   if (liste.firstChild) {
     liste.insertBefore(ligne, liste.firstChild);
   } else {
@@ -106,14 +107,13 @@ function creerLigne(statut) {
   }
 }
 
-// -------- Appels API --------
-
+// fait un appel à l'API
 async function appelAPI(url, options) {
   try {
-    const rsp = await fetch(url, options);
-    const json = await rsp.json().catch(() => ({}));
-    if (!rsp.ok) {
-      const msg = json?.error || json?.message || `Erreur HTTP ${rsp.status}`;
+    const resp = await fetch(url, options);
+    const json = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      const msg = json?.error || json?.message || `Erreur HTTP ${resp.status}`;
       throw new Error(msg);
     }
     return json;
@@ -122,23 +122,28 @@ async function appelAPI(url, options) {
   }
 }
 
+// vérifie une URL via l'API
 async function verifierUneURL(url) {
   if (!url || !/^https?:\/\//i.test(url)) {
     throw new Error(
       'Veuillez saisir une URL valide commençant par http:// ou https://',
     );
   }
+
   const reponse = await appelAPI('/api/verifier', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ url }),
   });
-  const statut = reponse.statut; // ton backend renvoie toujours {statut:{...}}
+
+  const statut = reponse.statut;
   if (!statut) throw new Error('Réponse API invalide');
+
   creerLigne(statut);
   return statut;
 }
 
+// charge les derniers résultats depuis l'API
 async function chargerResultats(limit = LIMITE_PAR_DEFAUT) {
   const reponse = await appelAPI(
     `/api/resultats?limit=${encodeURIComponent(limit)}`,
@@ -146,19 +151,20 @@ async function chargerResultats(limit = LIMITE_PAR_DEFAUT) {
       method: 'GET',
     },
   );
+
   const listeResultats = Array.isArray(reponse)
     ? reponse
     : reponse?.resultats ?? [];
-  // Réinitialise puis rend les résultats
+
   viderConsole();
-  for (const s of listeResultats) {
-    creerLigne(s);
+  for (const statut of listeResultats) {
+    creerLigne(statut);
   }
+
   return listeResultats.length;
 }
 
-// -------- Gestion des événements --------
-
+// soumission du formulaire
 formulaire.addEventListener('submit', async (e) => {
   e.preventDefault();
   const url = (champURL.value || '').trim();
@@ -179,6 +185,7 @@ formulaire.addEventListener('submit', async (e) => {
   }
 });
 
+// bouton vider
 btnVider.addEventListener('click', async () => {
   try {
     await appelAPI('/api/resultats', { method: 'DELETE' });
@@ -189,7 +196,7 @@ btnVider.addEventListener('click', async () => {
   }
 });
 
-// Au chargement : récupère les derniers résultats
+// chargement initial des résultats
 window.addEventListener('DOMContentLoaded', async () => {
   try {
     await chargerResultats(LIMITE_PAR_DEFAUT);
@@ -201,25 +208,28 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
-// -------- Auto-ping --------
-
+// démarrer l'auto-ping
 function startAutoPing() {
   const url = (champURL.value || '').trim();
-  const secs = parseInt(champFreq.value, 10);
+  const secondes = parseInt(champFreq.value, 10);
+
   if (!url) {
     afficherMessage("Saisissez d'abord une URL.", 'info');
     champURL.focus();
     return;
   }
-  if (!Number.isFinite(secs) || secs < 1) {
+  if (!Number.isFinite(secondes) || secondes < 1) {
     afficherMessage('Fréquence invalide. Entrez un nombre ≥ 1.', 'err');
     champFreq.focus();
     return;
   }
+
   if (intervalId) clearInterval(intervalId);
-  afficherMessage(`Auto-ping activé: toutes les ${secs}s`, 'ok');
+
+  afficherMessage(`Auto-ping activé: toutes les ${secondes}s`, 'ok');
+
   intervalId = setInterval(async () => {
-    if (enCours) return; // pas de chevauchement
+    if (enCours) return;
     enCours = true;
     try {
       await verifierUneURL(url);
@@ -228,9 +238,10 @@ function startAutoPing() {
     } finally {
       enCours = false;
     }
-  }, secs * 1000);
+  }, secondes * 1000);
 }
 
+// arrêter l'auto-ping
 function stopAutoPing() {
   if (intervalId) {
     clearInterval(intervalId);
