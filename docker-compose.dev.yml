@@ -2,23 +2,26 @@
 # Projet de session A25
 # By : Leandre Kanmegne
 
-version: "3.8"
-
 services:
   # service PostgreSQL
   postgres:
     image: postgres:16
     container_name: monitoring_postgres_dev
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: monitoring_database
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-monitoring_database}
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - postgres_dev_data:/var/lib/postgresql/data
       - ./src/database/init.sql:/docker-entrypoint-initdb.d/01-init.sql
       - ./src/database/dbtrigger.sql:/docker-entrypoint-initdb.d/02-triggers.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   # application Go en mode dev
   app:
@@ -29,12 +32,14 @@ services:
       - .:/app
       - ./web:/web
     ports:
-      - "8080:8080"
+      - "${PORT:-8080}:8080"
     env_file:
       - .env
-    command: go run main.go
+    command: go run ./src/cmd/server/main.go
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+    restart: on-failure
 
 volumes:
   postgres_dev_data:
@@ -42,3 +47,4 @@ volumes:
 # Commandes:
 # Démarrer: docker-compose -f docker-compose.dev.yml up
 # Arrêter: docker-compose -f docker-compose.dev.yml down
+# Voir logs: docker-compose -f docker-compose.dev.yml logs -f app

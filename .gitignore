@@ -4,4 +4,13 @@ app
 .env
 docker-compose.dev.yml
 Readme.txt
+*.exe
+*.dll
+*.so
+*.dylib
+.vscode/
+.idea/
+node_modules/
+*.swp
+.DS_Store
 
