@@ -289,8 +289,3 @@ docker-compose down -v
 - [ ] API pour gérer les moniteurs (CRUD complet)
 - [ ] Tests unitaires et d'intégration
 - [ ] Déploiement sur Render ou autre service cloud
-
-## 📧 Contact
-
-Leandre Kanmegne  
-Projet de session A25
