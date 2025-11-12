@@ -1,6 +1,6 @@
 ##  Description
 
-Service de monitoring simple qui vérifie automatiquement l'état de sites web et APIs. L'outil check régulièrement l'accessibilité et la rapidité de réponse des différents services, puis expose les résultats via une API REST et une interface web.
+Service de monitoring simple qui vérifie automatiquement l'état de sites web et APIs. L'outil check régulièrement l'accessibilité et la rapidité de réponse des différents services, puis expose les résultats via une API REST et une interface web. Ne prend en compte que les protocoles http et https
 
 ##  Fonctionnalités
 
