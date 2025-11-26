@@ -400,3 +400,14 @@ docker-compose down -v
 - [ ] API pour gérer les moniteurs (CRUD complet)
 - [ ] Tests unitaires et d'intégration
 - [ ] Déploiement sur Render ou autre service cloud
+
+
+## Autres liens utiles :
+
+- https://prometheus.io/docs/concepts/metric_types/
+- https://pkg.go.dev/search?q=postgresql&m=
+- https://github.com/upper/db/blob/v4.10.0/adapter/postgresql/database.go
+- https://github.com/prometheus/prometheus/blob/main/model/relabel/relabel.go
+- https://www.w3schools.com/go/go_syntax.php
+- https://pkg.go.dev/log#Logger.Fatal
+- https://dev.to/kengowada/go-routing-101-handling-and-grouping-routes-with-nethttp-4k0e
