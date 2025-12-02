@@ -2,7 +2,6 @@ tmp/
 app
 *.log
 .env
-docker-compose.dev.yml
 *.exe
 *.dll
 *.so
