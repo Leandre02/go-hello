@@ -10,9 +10,9 @@ Par : Leandre Kanmegne
 - Fichier .env configuré (voir .env.example) à la racine du projet
 
 # Commandes:
-Démarrer: docker-compose -f docker-compose.dev.yml up
-Arrêter: docker-compose -f docker-compose.dev.yml down
- Voir logs: docker-compose -f docker-compose.dev.yml logs -f app
+- Démarrer: docker-compose -f docker-compose.dev.yml up
+- Arrêter: docker-compose -f docker-compose.dev.yml down
+- Voir logs: docker-compose -f docker-compose.dev.yml logs -f app
 
 Une fois démarré:
 
