@@ -4,6 +4,7 @@
  * 
  * Lance le serveur HTTP et gère l'arrêt avec les signaux système
  * Point d'entrée principal de l'application
+ * Utilisation de WaitGroup en Go qui est un outil de synchronisation qui permet d’attendre que plusieurs goroutines aient fini leur travail avant de continuer.
  */
 
 package main
@@ -77,5 +78,5 @@ func main() {
 		log.Fatalf("Erreur lors de l'arrêt du serveur : %v", err)
 	}
 
-	log.Println("Serveur arrêté !!!")
+	log.Println("Serveur arrêté")
 }
