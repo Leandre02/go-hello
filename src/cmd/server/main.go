@@ -70,7 +70,7 @@ func main() {
 	<-ctx.Done()
 	log.Println("Arrêt du serveur en cours...")
 
-	// timeout pour l'arrêt gracieux
+	// timeout pour l'arrêt du serveur
 	ctxShutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
