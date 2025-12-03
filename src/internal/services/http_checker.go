@@ -29,7 +29,7 @@ func VerifierURL(ctx context.Context, url string) models.StatutMoniteur {
 
 	debut := time.Now()
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	req.Header.Set("User-Agent", "MoniteurMVP/1.0")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_3_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.199 Safari/537.36")
 
 	statut := models.StatutMoniteur{
 		URL:      url,
