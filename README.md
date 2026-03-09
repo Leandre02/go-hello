@@ -10,7 +10,7 @@ Par : Leandre Kanmegne
 - Fichier .env configuré (voir .env.example) à la racine du projet
 
 # Commandes:
-- Démarrer: docker-compose -f docker-compose.dev.yml up
+- Démarrer: docker-compose -f docker-compose.dev.yml up (wsl) || docker compose -f docker-compose.dev.yml up (fedora)
 - Arrêter: docker-compose -f docker-compose.dev.yml down
 - Voir logs: docker-compose -f docker-compose.dev.yml logs -f app
 - Test avec race detector : Pour lancer: go test ./... -race dans la console wsl

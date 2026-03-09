@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS monitoring.alertes (
 
 -- Détecte les changements d'état et insère une alerte
 CREATE
-OR REPLACE FUNCTION monitoring.detecter_transition() RETURNS TRIGGER AS $ $ DECLARE ancien_etat BOOLEAN;
+OR REPLACE FUNCTION monitoring.detecter_transition() RETURNS TRIGGER AS $$ DECLARE ancien_etat BOOLEAN;
 
 BEGIN -- récupère l'état précédent
 SELECT
@@ -73,7 +73,7 @@ RETURN NEW;
 
 END;
 
-$ $ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql;
 
 -- Trigger qui s'exécute après chaque insertion de statut
 DROP TRIGGER IF EXISTS trigger_alerte_statut ON monitoring.statuts;
