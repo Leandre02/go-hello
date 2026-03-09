@@ -17,4 +17,4 @@ Par : Leandre Kanmegne
 
 Une fois démarré:
 
-API et interface web accessibles sur: http://localhost:8080 (ou le port défini dans PORT).
+interface web accessibles sur: https://monitoring.memberbase.ca/.
