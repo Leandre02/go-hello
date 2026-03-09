@@ -1,4 +1,5 @@
 # Service de Monitoring
+Un service de monitoring codé en Go permettant de suivre l'etat de divers sites web en https
 
 Projet de session A25  - Technologies Émergentes
 Par : Leandre Kanmegne
